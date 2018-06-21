@@ -2,9 +2,11 @@ package main
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/signal"
 	"regexp"
@@ -18,6 +20,12 @@ import (
 func init() {
 	flag.StringVar(&token, "t", "", "Bot Token")
 	flag.Parse()
+}
+
+func check(e error) {
+	if e != nil {
+		panic(e)
+	}
 }
 
 var token string
@@ -49,8 +57,11 @@ func main() {
 		return
 	}
 
-	bot_commands["!moc"] = "https://i.imgur.com/2Df1bLq.jpg"
-	bot_commands["!police"] = "http://i.imgur.com/JRLRL3A.jpg"
+	dat, read_err := ioutil.ReadFile("./botcommands.json")
+	check(read_err)
+	if unmarshal_err := json.Unmarshal(dat, &bot_commands); unmarshal_err != nil {
+		panic(unmarshal_err)
+	}
 	authorised_users["183017941158068226"] = "Alycaea"
 
 	// Register ready as a callback for the ready events.
@@ -134,6 +145,9 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			fmt.Println()
 			fmt.Println(bot_commands)
 			fmt.Println()
+			bot_commands_json, _ := json.Marshal(bot_commands)
+			write_err := ioutil.WriteFile("./botcommands.json", bot_commands_json, 0644)
+			check(write_err)
 		} else {
 			s.ChannelMessageSend(m.ChannelID, "You are not authorised to use this command! Police!")
 		}
