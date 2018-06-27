@@ -30,9 +30,8 @@ func check(e error) {
 
 var token string
 var buffer = make([][]byte, 0)
-var hamu_hunger_regexp = regexp.MustCompile("([iI]( am|'m) |^)[hH]ungry")
+var hamu_hunger_regexp = regexp.MustCompile("([iI]( am|'m) [hH]ungry|^[hH]ungry$)")
 var bot_commands = make(map[string]string)
-
 var authorised_users = make(map[string]string)
 
 func main() {
@@ -107,49 +106,57 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
-	if val, exists := bot_commands[m.Content]; exists {
-		s.ChannelMessageSend(m.ChannelID, val)
-	} else if strings.HasPrefix(m.Content, "!airhorn") {
-		// Find the channel that the message came from.
-		c, err := s.State.Channel(m.ChannelID)
-		if err != nil {
-			// Could not find channel.
-			return
+	found := false
+	for k, v := range bot_commands {
+		if strings.Contains(m.Content, k) {
+			s.ChannelMessageSend(m.ChannelID, v)
+			found = true
+			break
 		}
-
-		// Find the guild for that channel.
-		g, err := s.State.Guild(c.GuildID)
-		if err != nil {
-			// Could not find guild.
-			return
-		}
-
-		// Look for the message sender in that guild's current voice states.
-		for _, vs := range g.VoiceStates {
-			if vs.UserID == m.Author.ID {
-				err = playSound(s, g.ID, vs.ChannelID)
-				if err != nil {
-					fmt.Println("Error playing sound:", err)
-				}
-
+	}
+	if !found {
+		if strings.Contains(m.Content, "!airhorn") {
+			// Find the channel that the message came from.
+			c, err := s.State.Channel(m.ChannelID)
+			if err != nil {
+				// Could not find channel.
 				return
 			}
-		}
-	} else if hamu_hunger_regexp.MatchString(m.Content) {
-		s.ChannelMessageSend(m.ChannelID, "May I recommend a delicious Hamu Hamu?")
-	} else if strings.HasPrefix(m.Content, "!add_command") {
-		if _, exists := authorised_users[m.Author.ID]; exists {
-			new_command := strings.Split(strings.Replace(m.Content, "!add_command ", "", 1), ":::")
-			trigger, action := new_command[0], new_command[1]
-			bot_commands[trigger] = action
-			fmt.Println()
-			fmt.Println(bot_commands)
-			fmt.Println()
-			bot_commands_json, _ := json.Marshal(bot_commands)
-			write_err := ioutil.WriteFile("./botcommands.json", bot_commands_json, 0644)
-			check(write_err)
-		} else {
-			s.ChannelMessageSend(m.ChannelID, "You are not authorised to use this command! Police!")
+
+			// Find the guild for that channel.
+			g, err := s.State.Guild(c.GuildID)
+			if err != nil {
+				// Could not find guild.
+				return
+			}
+
+			// Look for the message sender in that guild's current voice states.
+			for _, vs := range g.VoiceStates {
+				if vs.UserID == m.Author.ID {
+					err = playSound(s, g.ID, vs.ChannelID)
+					if err != nil {
+						fmt.Println("Error playing sound:", err)
+					}
+
+					return
+				}
+			}
+		} else if hamu_hunger_regexp.MatchString(m.Content) {
+			s.ChannelMessageSend(m.ChannelID, "May I recommend a delicious Hamu Hamu?")
+		} else if strings.HasPrefix(m.Content, "!add_command") {
+			if _, exists := authorised_users[m.Author.ID]; exists {
+				new_command := strings.Split(strings.Replace(m.Content, "!add_command ", "", 1), ":::")
+				trigger, action := new_command[0], new_command[1]
+				bot_commands[trigger] = action
+				fmt.Println()
+				fmt.Println(bot_commands)
+				fmt.Println()
+				bot_commands_json, _ := json.Marshal(bot_commands)
+				write_err := ioutil.WriteFile("./botcommands.json", bot_commands_json, 0644)
+				check(write_err)
+			} else {
+				s.ChannelMessageSend(m.ChannelID, "You are not authorised to use this command! Police!")
+			}
 		}
 	}
 }
