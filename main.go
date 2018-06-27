@@ -141,6 +141,9 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 					return
 				}
 			}
+		} else if strings.HasPrefix(m.Content, "!status") {
+			bot_status := strings.Replace(m.Content, "!status ", "", 1)
+			s.UpdateStatus(0, bot_status)
 		} else if hamu_hunger_regexp.MatchString(m.Content) {
 			s.ChannelMessageSend(m.ChannelID, "May I recommend a delicious Hamu Hamu?")
 		} else if strings.HasPrefix(m.Content, "!add_command") {
