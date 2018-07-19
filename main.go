@@ -112,7 +112,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			found = append(found, k)
 		}
 	}
-	if len(found) > 0 {
+	if len(found) > 0 && !strings.HasPrefix(m.Content, "!add_command") {
 		longest_string_length := 0
 		longest_string := ""
 		for _, my_key := range found {
