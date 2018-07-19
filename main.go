@@ -106,15 +106,24 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
-	found := false
-	for k, v := range bot_commands {
+	var found []string
+	for k, _ := range bot_commands {
 		if strings.Contains(m.Content, k) {
-			s.ChannelMessageSend(m.ChannelID, v)
-			found = true
-			break
+			found = append(found, k)
 		}
 	}
-	if !found {
+	if len(found) > 0 {
+		longest_string_length := 0
+		longest_string := ""
+		for _, my_key := range found {
+			if len(my_key) > longest_string_length {
+				longest_string = my_key
+				longest_string_length = len(my_key)
+			}
+		}
+		my_value := bot_commands[longest_string]
+		s.ChannelMessageSend(m.ChannelID, my_value)
+	} else {
 		if strings.Contains(m.Content, "!airhorn") {
 			// Find the channel that the message came from.
 			c, err := s.State.Channel(m.ChannelID)
@@ -142,8 +151,12 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 				}
 			}
 		} else if strings.HasPrefix(m.Content, "!status") {
-			bot_status := strings.Replace(m.Content, "!status ", "", 1)
-			s.UpdateStatus(0, bot_status)
+			if _, exists := authorised_users[m.Author.ID]; exists {
+				bot_status := strings.Replace(m.Content, "!status ", "", 1)
+				s.UpdateStatus(0, bot_status)
+			} else {
+				s.ChannelMessageSend(m.ChannelID, "You are not authorised to use this command! Police!")
+			}
 		} else if hamu_hunger_regexp.MatchString(m.Content) {
 			s.ChannelMessageSend(m.ChannelID, "May I recommend a delicious Hamu Hamu?")
 		} else if strings.HasPrefix(m.Content, "!add_command") {
