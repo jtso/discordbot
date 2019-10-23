@@ -30,9 +30,10 @@ func check(e error) {
 
 var token string
 var buffer = make([][]byte, 0)
-var hamu_hunger_regexp = regexp.MustCompile("([iI]( am|'m) [hH]ungry|^[hH]ungry$)")
+var hamu_hunger_regexp = regexp.MustCompile("([iI]( am|'?m) [hH]ungry|^[hH]ungry$)")
 var bot_commands = make(map[string]string)
 var authorised_users = make(map[string]string)
+var protected_commands []string
 
 func main() {
 
@@ -61,6 +62,8 @@ func main() {
 	if unmarshal_err := json.Unmarshal(dat, &bot_commands); unmarshal_err != nil {
 		panic(unmarshal_err)
 	}
+	protected_commands = append(protected_commands, "!add_command")
+	protected_commands = append(protected_commands, "!list_commands")
 	authorised_users["183017941158068226"] = "Alycaea"
 
 	// Register ready as a callback for the ready events.
@@ -96,6 +99,24 @@ func ready(s *discordgo.Session, event *discordgo.Ready) {
 	s.UpdateStatus(0, "with Alycaea")
 }
 
+func createKeyValuePairs(m map[string]string) []string {
+	var s []string
+	for key, value := range m {
+		command_string := fmt.Sprintf("%s = %s", key, value)
+		s = append(s, command_string)
+	}
+	return s
+}
+
+func sliceContains(a []string, x string) bool {
+	for _, n := range a {
+		if x == n {
+			return true
+		}
+	}
+	return false
+}
+
 // This function will be called (due to AddHandler above) every time a new
 // message is created on any channel that the autenticated bot has access to.
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
@@ -112,7 +133,8 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			found = append(found, k)
 		}
 	}
-	if len(found) > 0 && !strings.HasPrefix(m.Content, "!add_command") {
+	command_prefix := strings.SplitN(m.Content, " ", 2)[0]
+	if len(found) > 0 && !sliceContains(protected_commands, command_prefix) {
 		longest_string_length := 0
 		longest_string := ""
 		for _, my_key := range found {
@@ -150,6 +172,12 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 					return
 				}
 			}
+		} else if strings.HasPrefix(m.Content, "!pfp") {
+			userID := strings.Replace(m.Content, "!pfp ", "", 1)
+			if len(userID) > 0 {
+				queried_user, _ := s.User(userID)
+				s.ChannelMessageSend(m.ChannelID, queried_user.AvatarURL("2048"))
+			}
 		} else if strings.HasPrefix(m.Content, "!status") {
 			if _, exists := authorised_users[m.Author.ID]; exists {
 				bot_status := strings.Replace(m.Content, "!status ", "", 1)
@@ -159,6 +187,18 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			}
 		} else if hamu_hunger_regexp.MatchString(m.Content) {
 			s.ChannelMessageSend(m.ChannelID, "May I recommend a delicious Hamu Hamu?")
+		} else if strings.HasPrefix(m.Content, "!list_commands") {
+			if _, exists := authorised_users[m.Author.ID]; exists {
+				bot_commands_slice := createKeyValuePairs(bot_commands)
+				s.ChannelMessageSend(m.ChannelID, "Listing commands at a rate of 1 per second brace yourself")
+				for string_command := range bot_commands_slice {
+					s.ChannelMessageSend(m.ChannelID, bot_commands_slice[string_command])
+					time.Sleep(1000 * time.Millisecond)
+				}
+				s.ChannelMessageSend(m.ChannelID, "All commands listed! Have a nice day!")
+			} else {
+				s.ChannelMessageSend(m.ChannelID, "You are not authorised to use this command! Police!")
+			}
 		} else if strings.HasPrefix(m.Content, "!add_command") {
 			if _, exists := authorised_users[m.Author.ID]; exists {
 				new_command := strings.Split(strings.Replace(m.Content, "!add_command ", "", 1), ":::")
